@@ -92,6 +92,10 @@ def register(request):
 
 # return username based on sent POST Token
 
+def index(request):
+    context = {}
+    return render(request, 'index.html', context)
+    
 @csrf_exempt
 def submit_expense(request):
     """user submits an expense"""
