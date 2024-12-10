@@ -12,17 +12,21 @@ import random
 import time
 from django.utils.crypto import get_random_string
 from django.db.models import Sum, Count
+from django.shortcuts import render, get_object_or_404
+from django.views.decorators.http import require_POST
+from .utils import grecaptcha_verify, RateLimited
 
 # Create your views here.
 
 @csrf_exempt
+@require_POST
 def login(request):
     if 'username' in request.POST and 'password' in request.POST:
         username = request.POST['username']
         password = request.POST['password']
-        this_user = User.objects.get(username = username)
+        this_user = get_object_or_404(User, username=username)
         if (check_password(password, this_user.password)):
-            this_token = Token.objects.get(user = this_user)
+            this_token = get_object_or_404(Token, user=this_user)
             token = this_token.token
             context = {}
             context['result'] = 'ok'
@@ -112,6 +116,27 @@ def register(request):
 # return username based on sent POST Token
 
 @csrf_exempt
+@require_POST
+def whoami(request):
+    if request.POST.has_key('token'):
+        this_token = request.POST['token']  # TODO: Check if there is no `token`- done-please Check it
+        # Check if there is a user with this token; will retun 404 instead.
+        this_user = get_object_or_404(User, token__token=this_token)
+
+        return JsonResponse({
+            'user': this_user.username,
+        }, encoder=JSONEncoder)  # return {'user':'USERNAME'}
+
+    else:
+        return JsonResponse({
+            'message': 'لطفا token را نیز ارسال کنید .',
+        }, encoder=JSONEncoder)  #
+
+
+# return General Status of a user as Json (income,expense)
+
+@csrf_exempt
+@require_POST
 def generalstat(request):
     #TODO: should get a valid duration (from - to), if not, use 1 month
     #TODO: is the token valid?
@@ -129,6 +154,7 @@ def index(request):
     return render(request, 'index.html', context)
 
 @csrf_exempt
+@require_POST
 def submit_expense(request):
     """user submits an expense"""
 
@@ -148,6 +174,7 @@ def submit_expense(request):
     }, encoder = JSONEncoder)
 
 @csrf_exempt
+@require_POST
 def submit_income(request):
     """user submits an income"""
 
