@@ -6,4 +6,5 @@ urlpatterns = [
     path('submit/income/', views.submit_income, name = 'submit_income'),
     path('accounts/register/', views.register, name = 'register'),
     path('', views.index, name = 'index'),
+    path('q/generalestat/', views.generalestat, name = 'generalestat'),
 ]

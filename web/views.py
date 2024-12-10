@@ -11,6 +11,7 @@ import requests
 import random
 import time
 from django.utils.crypto import get_random_string
+from django.db.models import Sum, Count
 
 # Create your views here.
 
@@ -92,10 +93,23 @@ def register(request):
 
 # return username based on sent POST Token
 
+@csrf_exempt
+def generalestat(request):
+    #TODO: should get a valid duration (from - to), if not, use 1 month
+    #TODO: is the token valid?
+    this_token = request.POST['token']
+    this_user = User.objects.filter(token__token = this_token).get()
+    income = Income.objects.filter(user = this_user).aggregate(Count('amount'), Sum('amount'))
+    expense = Expense.objects.filter(user = this_user).aggregate(Count('amount'), Sum('amount'))
+    context = {}
+    context['expense'] = expense
+    context['income'] = income
+    return JsonResponse(context, encoder=JSONEncoder)
+
 def index(request):
     context = {}
     return render(request, 'index.html', context)
-    
+
 @csrf_exempt
 def submit_expense(request):
     """user submits an expense"""
