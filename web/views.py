@@ -4,7 +4,7 @@ from json import JSONEncoder
 from django.views.decorators.csrf import csrf_exempt
 from web.models import User, Token, Expense, Income, Passwordresetcodes
 from datetime import datetime
-from django.contrib.auth.hashers import make_password
+from django.contrib.auth.hashers import make_password, check_password
 from postmark import PMMail
 from django.conf import settings
 import requests
@@ -14,6 +14,24 @@ from django.utils.crypto import get_random_string
 from django.db.models import Sum, Count
 
 # Create your views here.
+
+@csrf_exempt
+def login(request):
+    if 'username' in request.POST and 'password' in request.POST:
+        username = request.POST['username']
+        password = request.POST['password']
+        this_user = User.objects.get(username = username)
+        if (check_password(password, this_user.password)):
+            this_token = Token.objects.get(user = this_user)
+            token = this_token.token
+            context = {}
+            context['result'] = 'ok'
+            context['token'] = token
+            return JsonResponse(context, encoder=JSONEncoder)
+        else:
+            context = {}
+            context['result'] = 'error'
+            return JsonResponse(context, encoder=JSONEncoder)
 
 random_str = lambda N: ''.join(
     random.SystemRandom().choice(string.ascii_uppercase + string.ascii_lowercase + string.digits) for _ in range(N))
@@ -94,7 +112,7 @@ def register(request):
 # return username based on sent POST Token
 
 @csrf_exempt
-def generalestat(request):
+def generalstat(request):
     #TODO: should get a valid duration (from - to), if not, use 1 month
     #TODO: is the token valid?
     this_token = request.POST['token']
