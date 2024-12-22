@@ -21,10 +21,20 @@ output: status:ok & token
 /accounts/register/
 step1:
 POST i
-nput: username, email, password
+input: username, email, password
 output: status:ok
 step2:
-#click on link with the code in the email 
+#click on link with the code in the email
 GET
 input: email, code
 output: status: ok (shows the token)
+
+/q/expense/
+POST, returns json
+input: token, num (optinal, default is 10)
+output: last num expenses
+
+/q/income/
+POST, returns json
+input: token, num (optinal, default is 10)
+output: last num incomes

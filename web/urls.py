@@ -7,6 +7,9 @@ urlpatterns = [
     path('accounts/register/', views.register, name = 'register'),
     path('', views.index, name = 'index'),
     path('q/generalstat/', views.generalstat, name = 'generalstat'),
-    path('accounts/login', views.login, name = 'login'),
-    path('accounts/whoami/', views.whoami, name = 'whoami')
+    path('accounts/login/', views.login, name = 'login'),
+    path('accounts/whoami/', views.whoami, name = 'whoami'),
+    path('news/', views.news, name = 'news'),
+    path('q/expense/', views.query_expense, name = 'query_expense'),
+    path('q/income/', views.query_income, name = 'query_income'),
 ]

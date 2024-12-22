@@ -15,27 +15,51 @@ from django.db.models import Sum, Count
 from django.shortcuts import render, get_object_or_404
 from django.views.decorators.http import require_POST
 from .utils import grecaptcha_verify, RateLimited
+from django.core import serializers
+from django.contrib.auth.decorators import login_required
 
 # Create your views here.
-
-@csrf_exempt
-@require_POST
 def login(request):
     if 'username' in request.POST and 'password' in request.POST:
         username = request.POST['username']
         password = request.POST['password']
         this_user = get_object_or_404(User, username=username)
-        if (check_password(password, this_user.password)):
+        if check_password(password, this_user.password):
             this_token = get_object_or_404(Token, user=this_user)
             token = this_token.token
-            context = {}
-            context['result'] = 'ok'
-            context['token'] = token
-            return JsonResponse(context, encoder=JSONEncoder)
+
+            # Save user ID in the session
+            request.session['user_id'] = this_user.id
+
+            # Fetch user expenses and incomes
+            expenses = Expense.objects.filter(user=this_user)
+            incomes = Income.objects.filter(user=this_user)
+
+            # total
+            total_expense = expenses.aggregate(Sum('amount'))['amount__sum'] or 0
+            total_income = incomes.aggregate(Sum('amount'))['amount__sum'] or 0
+            context = {
+                'result': 'ok',
+                'token': token,
+                'expenses': expenses,
+                'incomes': incomes,
+                'total_expense': total_expense,
+                'total_income': total_income
+            }
+            print("HHHHHHHHHHHHHHHHHHHHHHHHHHHH",this_user)
+            return render(request, 'dashboard.html', context)
         else:
-            context = {}
-            context['result'] = 'error'
+            context = {'result': 'error'}
             return JsonResponse(context, encoder=JSONEncoder)
+    else:
+        context = {'message': ''}
+        return render(request, 'login.html', context)
+
+@csrf_exempt
+def news(request):
+    news = News.objects.all().order_by('-date')[:11]
+    news_serialized = serializers.serialize("json", news)
+    return JsonResponse(news_serialized, encoder=JSONEncoder, safe=False)
 
 random_str = lambda N: ''.join(
     random.SystemRandom().choice(string.ascii_uppercase + string.ascii_lowercase + string.digits) for _ in range(N))
@@ -137,6 +161,27 @@ def whoami(request):
 
 @csrf_exempt
 @require_POST
+def query_expense(request):
+    this_token = request.POST['token']
+    num = request.POST.get('num', 10)
+    this_user = get_object_or_404(User, token__token=this_token)
+    expense = Expense.objects.filter(user=this_user).order_by('-date')[:num]
+    expense_serialized = serializers.serialize("json", expense)
+    return JsonResponse(expense_serialized, encoder=JSONEncoder, safe=False)
+
+
+@csrf_exempt
+@require_POST
+def query_income(request):
+    this_token = request.POST['token']
+    num = request.POST.get('num', 10)
+    this_user = get_object_or_404(User, token__token=this_token)
+    income = Income.objects.filter(user=this_user).order_by('-date')[:num]
+    income_serialized = serializers.serialize("json", income)
+    return JsonResponse(income_serialized, encoder=JSONEncoder, safe=False)
+
+@csrf_exempt
+@require_POST
 def generalstat(request):
     #TODO: should get a valid duration (from - to), if not, use 1 month
     #TODO: is the token valid?
@@ -153,42 +198,58 @@ def index(request):
     context = {}
     return render(request, 'index.html', context)
 
+
 @csrf_exempt
-@require_POST
+# @require_POST
 def submit_expense(request):
     """user submits an expense"""
-
-    #TODO: validate data. user might be fake. token might be fake. amount might be ....
-    this_token = request.POST['token']
-    this_user = User.objects.filter(token__token = this_token).get()
-    if 'date' not in request.POST:
-        date = datetime.now()
-    Expense.objects.create(user = this_user, amount = request.POST['amount'],
-        text = request.POST['text'], date = date)
+    if request.method == 'POST':
+        #TODO: validate data. user might be fake. token might be fake. amount might be ....
+        # this_token = request.POST['token']
+        # this_token =request.user.Token
+        # this_user = User.objects.filter(token__token = this_token).get()
+        user_id = request.session.get('user_id')
+        this_user = get_object_or_404(User, id=user_id)
+        # this_user = request.user
+        print("HHHHHHHHHHHHHHHHHHHHHHHHHHHH",this_user)
+        if 'date' not in request.POST:
+            date = datetime.now()
+        Expense.objects.create(user = this_user, amount = request.POST['amount'],
+            text = request.POST['text'], date = request.POST['date'])
+    context = {}
+    return render(request, 'submit_expense.html', context)
 
     # print("I'm in submit expense")
     # print (request.POST)
 
-    return JsonResponse({
-        'status' : 'ok'
-    }, encoder = JSONEncoder)
+    # return JsonResponse({
+    #     'status' : 'ok'
+    # }, encoder = JSONEncoder)
+
 
 @csrf_exempt
-@require_POST
+@login_required
 def submit_income(request):
     """user submits an income"""
+    if request.method == 'POST':
 
-    #TODO: validate data. user might be fake. token might be fake. amount might be ....
-    this_token = request.POST['token']
-    this_user = User.objects.filter(token__token = this_token).get()
-    if 'date' not in request.POST:
-        date = datetime.now()
-    Income.objects.create(user = this_user, amount = request.POST['amount'],
-        text = request.POST['text'], date = date)
+        user_id = request.session.get('user_id')
+        this_user = get_object_or_404(User, id=user_id)
+        # this_user = request.user
+        print('************************', this_user)
+        #TODO: validate data. user might be fake. token might be fake. amount might be ....
+        # this_token = request.POST['token']
+        # this_user = User.objects.filter(token__token = this_token).get()
+        if 'date' not in request.POST:
+            date = datetime.now()
+        Income.objects.create(user = this_user, amount = request.POST['amount'],
+            text = request.POST['text'], date = request.POST['date'])
 
-    # print("I'm in submit income")
-    # print (request.POST)
+    context = {}
+    return render(request, 'submit_income.html', context)
+        # print("I'm in submit income")
+        # print (request.POST)
 
-    return JsonResponse({
-        'status' : 'ok'
-    }, encoder = JSONEncoder)
+        # return JsonResponse({
+        #     'status' : 'ok'
+        # }, encoder = JSONEncoder)
